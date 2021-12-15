@@ -1,0 +1,127 @@
+---
+title: "Wildlife Strikes"
+author: "Zoe Bridgham"
+date: "11/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+
+```
+# Introduction to Data
+The data set is titled Aircraft Wildlife Strikes, 1990-2015 and was downloaded from [kaggle](https://www.kaggle.com/faa/wildlife-strikes). This data set was made from data published by the Federal Aviation Association. The data set includes a ton of information about the incidents, including: company, date, species hit, injuries, fatalities, and damage done.
+
+# Research Questions
+There are two research questions explored in this analysis:
+
+1. What species cause the most negatives outcome in terms of injury and fatality? Understanding which species cause the most negative outcomes can hopefully lead to solutions that avoid these specific species.
+
+2. What parts of the airplane sustain the most damage? Understanding this could be useful for manufactures to create more resilient planes in the future.
+
+# Methodology 
+For analyzing fatalities and injury by species, only the top 5 species for injury and fatalities were kept. There were 59 species responsible for all injuries and fatalities, but many of them only had 1 data point, making many incidents statistically insignificant. With this reduction, our focus was narrowed down to 7 species with the highest impact. 
+
+For the analysis of the plane damage, only records that indicated the plane was damaged were included. There were many records for a wildlife strike that did not indicate any damage was done and therefor is not relevant to this analysis. 
+
+# Results 
+```{r input and cleaning, echo=FALSE}
+#setwd("G:/My Drive/2021Fall/DAT301/Project1/chef-s-choice-ZeBomb-main/chef-s-choice-ZeBomb-main")
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+rawData <- read.csv("data/database.csv")
+
+# Getting cols of interest
+part1 <- rawData[,1:4]
+part2 <- rawData[, c("Species.ID", "Species.Name", "Fatalities", "Injuries")]
+part3 <- rawData[37:50]
+
+data <- cbind(part1, part2, part3)
+
+```
+
+
+
+## Fatalities and Injury by species
+
+
+```{r species, echo=FALSE}
+#Since we are interested in the most dangerous incidents, we will only be looking at the top 5 species for injuries and fatalities, otherwise we would have 
+#a bar plot with 59 species that is much harder to read visually and has many species with only one or two incidents. 
+
+# Fatalities and injuries vs species 
+# For both, remove NAs, 0s and aggregate by species name
+inj <- na.omit(data[c("Species.ID", "Injuries")]) 
+inj2 <-inj %>% filter(Injuries > 0)
+injBySpecies <- aggregate(inj2$Injuries, list(inj2$Species.ID), sum) #sum grouped by species
+colnames(injBySpecies) <- colnames(inj2) #readd names
+injBySpecies <- injBySpecies[order(-injBySpecies$Injuries),] # in decreasing order
+
+
+fatal <- na.omit(data[c("Species.ID", "Fatalities")])
+fatal2  <- fatal %>% filter(Fatalities > 0)
+fatalBySpecies <- aggregate(fatal2$Fatalities, list(fatal2$Species.ID), sum)
+colnames(fatalBySpecies) <- colnames(fatal2)
+fatalBySpecies <- fatalBySpecies[order(-fatalBySpecies$Fatalities),]
+
+# Merge top 5 species from fatalities and injuries
+both <- merge(injBySpecies[1:5,], fatalBySpecies[1:5,], key = "Species.Name", all = TRUE)
+
+
+#Reformat table for barplot
+rownames(both)<- both[,1]
+bothT <- t(both[2:3])
+
+
+#colnames(bothT) <- bothT[1,]
+
+```
+
+``` {r Species plot, echo=FALSE}
+barplot(bothT,
+  main = "Fatalities and Injuries by species hit",
+  xlab = "Fatalities and Injuries",
+  ylab = "Count",
+  col = c("orange", "red"),
+  beside = TRUE)
+legend("topright", 
+       legend = c("Injuries", "Fatalities"),
+       col = c("orange", "red"),
+       pch = 15)
+```
+
+### Species ID to Species Name
+```{r Further exploration,echo=FALSE}
+redtail <- filter(data, Species.ID == "K3302")
+CanadaGoose <- filter(data, Species.ID == "J2204")
+```
+``` {r Species Key,echo=FALSE }
+idKey <- merge(both[1], unique(data[5:6]), all = FALSE)
+print(idKey)
+```
+
+For the entry on K3302, Red-tailed hawk, all 8 fatalities were from 1 incident, so this one should be taken as more of an outlier until specific details of that record are understood. The injuries from j2204, Canada goose, are a little more spread out, with 100 injuries coming from 1 incident and the other 17 injuries coming from 14 incidents.
+
+
+## Pie Chart of Damage by part
+```{r parts hit, echo=FALSE}
+hits <- data[9:22]
+damaged <- filter(hits, Aircraft.Damage > 0) # Only records with damage
+damaged2 <- as.data.frame(c(damaged[3],damaged[5],damaged[7],damaged[9],damaged[11],damaged[13]))
+totals <- colSums(damaged2,na.rm = TRUE)
+pie(totals, 
+    main = "Frequency of Damage by Part")
+```
+
+This chart is out of 8,482 records. Based on this chart, Engines take over half of all the recorded damage done in the wildlife strikes. It is important to note that other parts of the plane were damaged as well, there were 14969 records that indicated that damage was done, but only 8,482 of these records indicated damage on one of the 6 parts recorded. This may be the case because of how vital these parts are to aircraft function.
+
+# Conclusion
+Based on the fatalities and injuries by species hit, there are a few select species that do the most damage, but the species that stick out the most, stick out due to one incident, rather than reoccurring instances. This is the case with the fatalities from the Red-tailed hawk and injuries from the Canada Goose. This makes it difficult to support a causal link between species and fatalities or injuries, and therefor makes this data set alone inappropriate for selecting solutions to avoid fatalities and injuries.
+
+Based on this data analysis of frequency of damage by part, the engines take the most damage. If manufactures and pilots are concerned about wildlife strikes, making the engines more resilient would be the first step in protecting the equipment and subsequently the cargo.
+
+The next logical step might be to merge these two questions by determining which species do the most damage to plane parts. This may give insight to manufacturers on how to best reinforce these parts. It would not be a logical next step to determine which damaged part correlates with fatalities and injuries because of how infrequent the fatalities and injuries are, and how heavy the outliers weight the data. There are many factors in these incidents that are not accounted for in this data set and there is not enough information to suggest causation between damages and fatalities or injuries.
+
+# Citation
+Federal Aviation Administration. (2008). Aircraft Wildlife Strikes, 1990 -2015 (Version 1) [Digital]. Location:Kaggle
